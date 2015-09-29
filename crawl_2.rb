@@ -12,6 +12,10 @@ require_relative 'get_domain_function'
 require 'global_phone'
 GlobalPhone.db_path = 'global_phone.json'
 require 'unirest'
+require 'redis'
+require 'redis-namespace'
+
+
 
 
 domains = [
@@ -38285,9 +38289,49 @@ domains = [
 ]
 
 
+
+
+###### GOOD TEST CASES:
+# www.vitamart.ca - literally just runs forever, so annoying
+# azuqua.com - every single link on here is a redirect, lol
+
 UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2227.1 Safari/537.36'
 
-def crawl_url(target, target_indx, site_hash, errors, storage, is_redirect)
+# ALL OPTIONS: http://stackoverflow.com/questions/14227555/how-to-crawl-only-the-root-url-with-anemone
+DEFAULT_OPTS = {
+  :depth_limit=>1,
+  :user_agent=>UA,
+  :discard_page_bodies => true,
+  :storage=> Anemone::Storage.Redis, #Anemone::Storage.PStore('pages.pstore'),
+  :accept_cookies => true,
+  :read_timeout => 10,
+  :verbose=>true
+}
+
+#domains = ['https://vitamart.ca']   ### make sure all urls have http in beginning, else relative url errors will occur
+domains = domains.shuffle[0..25]
+# domains = ['http://bexargoods.com']
+
+
+# object1 = Marshal.load(File.read('../mashape/"hs-analytics"/response_object_1')); 0
+# arr = object1.body['hits']['hits']; 0
+# domains = []
+# arr.each_with_index do |i,indx|
+#   # puts 'jrb + ' + indx.to_s
+#   # all sites seem to have redirect urls (and we only care about the ultimate domain so follow those)
+#   domains << 'http://'+get_domain(i['fields']['redirect'][0])
+# end ; 0
+# domains = domains.shuffle[0..20]
+
+
+
+
+puts 'Started at: ' + Time.now.to_s
+site_hash = {}
+errors = {}
+domains.each_with_index do |target, target_indx|
+
+
 
   begin
   uri = URI(target)
@@ -38299,13 +38343,14 @@ def crawl_url(target, target_indx, site_hash, errors, storage, is_redirect)
   # emails
   # twitters
 
-  Anemone.crawl(target, :depth_limit => 1, :user_agent=>UA) do |anemone|
+  a = Anemone
 
-    anemone.storage = storage
+  a.crawl(uri, DEFAULT_OPTS) do |anemone|
+
     
     anemone.on_every_page do |crawled_page|
 
-      if crawled_page.url.to_s.include? 'https://www.azuqua.com/solutions' then binding.pry end
+      #if crawled_page.url.to_s.include? 'https://www.azuqua.com/solutions' then binding.pry end
 
 
 
@@ -38339,7 +38384,7 @@ def crawl_url(target, target_indx, site_hash, errors, storage, is_redirect)
       if ( [301, 302].any? {|status| crawled_page.code == status}  )
         site_hash[domain]['redirect_pages'] += 1
         if site_hash[domain]['redirect_pages'] < 25 # if its done this >50 times, strong chance its caught in some redirect loop
-          crawl_url(crawled_page.redirect_to.to_s, target_indx, site_hash, errors, storage, true)
+          domains << crawled_page.redirect_to.to_s
         end
         next # since crawled_page.body will be nil if we keep going
       end
@@ -38367,7 +38412,7 @@ def crawl_url(target, target_indx, site_hash, errors, storage, is_redirect)
 
       end
 
-
+      #binding.pry
 
       crawled_page.body.scan(/[\w\d]+[\w\d.-]@[\w\d.-]+\.\w{2,6}/).each do |address|
 
@@ -38376,13 +38421,21 @@ def crawl_url(target, target_indx, site_hash, errors, storage, is_redirect)
         if address.empty?
           found = true
         else
-          found = ( site_hash[domain]['emails0'] + site_hash[domain]['emails1'] ).any? {|em| em.include? address }
+          good_pages_for_emails = ['contact', 'support', 'connect']
+          found_on_good_pg = good_pages_for_emails.any?{|p| crawled_page.url.to_s.include? p } ? mod_depth = '0' : mod_depth = depth
+          
+          if(found_on_good_pg)
+            look_in_arr = site_hash[domain]['emails0']
+            site_hash[domain]['emails1'].delete(address)
+          else
+            look_in_arr = site_hash[domain]['emails0'] + site_hash[domain]['emails1']
+          end
+          found = look_in_arr.any? {|em| em.include? address }
         end
 
-        if TLDS.any? {|tld| address.split('.').last == tld }
-          good_pages_for_emails = ['contact', 'support']
-          #if crawled_page.url.to_s.include?('contact') then else end
-          good_pages_for_emails.any?{|p| crawled_page.url.to_s.include? p } ? mod_depth = '0' : mod_depth = depth
+        if address.include? 'email.com' then found = true end
+
+        if TLDS.any? {|tld| address.split('.').last == tld }          
           site_hash[domain]['emails'+mod_depth]  += [address] if !found
         end
         # if Address.first(:email => address).nil?
@@ -38412,7 +38465,7 @@ def crawl_url(target, target_indx, site_hash, errors, storage, is_redirect)
       end
 
 
-      if crawled_page.depth == 0 && !is_redirect # we're on the first non-redirect page
+      if crawled_page.depth == 0 # we're on the first non-redirect page
         #### remember that on the previous ones, we wanted to scan source code
         #### for this one, we only want to scan VISIBLE TEXT (or else it gets all sorts of random numbers)
         crawled_page.doc.inner_text.scan(/[+\d()]+.[+\d()]+.\d+.\d+.\d+/).each do |num|
@@ -38439,7 +38492,7 @@ def crawl_url(target, target_indx, site_hash, errors, storage, is_redirect)
   end
   rescue Exception => e
 
-
+    binding.pry
     puts "error ---------------------------"
     puts e
 
@@ -38450,40 +38503,12 @@ def crawl_url(target, target_indx, site_hash, errors, storage, is_redirect)
   puts ''
   puts ''
 
+
+
+
 end
 
 
-
-
-
-
-domains = ['http://www.azuqua.com']   ### make sure all urls have http in beginning, else relative url errors will occur
-# domains = domains.shuffle[0..10]
-# domains = ['http://bexargoods.com']
-
-
-# object1 = Marshal.load(File.read('../mashape/"hs-analytics"/response_object_1')); 0
-# arr = object1.body['hits']['hits']; 0
-# domains = []
-# arr.each_with_index do |i,indx|
-#   # puts 'jrb + ' + indx.to_s
-#   # all sites seem to have redirect urls (and we only care about the ultimate domain so follow those)
-#   domains << 'http://'+get_domain(i['fields']['redirect'][0])
-# end ; 0
-# domains = domains.shuffle[0..20]
-
-
-
-
-puts 'Started at: ' + Time.now.to_s
-site_hash = {}
-errors = {}
-domains.each_with_index do |target, target_indx|
-
-  storage = Anemone::Storage.PStore('pages.pstore')
-  crawl_url(target, target_indx, site_hash, errors, storage, false)
-
-end
 
 
 

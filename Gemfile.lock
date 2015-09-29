@@ -74,6 +74,9 @@ GEM
       coderay (~> 1.0)
       method_source (~> 0.8)
       slop (~> 3.4)
+    redis (3.2.1)
+    redis-namespace (1.5.2)
+      redis (~> 3.0, >= 3.0.4)
     rest-client (1.8.0)
       http-cookie (>= 1.0.2, < 2.0)
       mime-types (>= 1.16, < 3.0)
@@ -100,4 +103,6 @@ DEPENDENCIES
   globalphone
   globalphone_dbgen
   pry
+  redis
+  redis-namespace
   unirest

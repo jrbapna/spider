@@ -7,6 +7,8 @@ def get_domain(url)
     new_url_split = new_url.split('.')
     first_indx = 1
     found_match = false
+    finds = []
+    special = false
     TLDS.each do |tld|
 
 
@@ -21,6 +23,7 @@ def get_domain(url)
       # weird edge case not handled: you.can.go.far.com  most times nobody does more than go.far.com
 
       found_indx = new_url_split.index{|x| x == tld} # finds occurrence of a matching tld
+      finds << found_indx
       
       # for size 3 or greater
       if found_indx && found_indx>=1 && new_url_split.size >= 3
@@ -30,7 +33,7 @@ def get_domain(url)
         else
           # first>found for cases where something .co.uk  the first_indx should then be set to uk
           # found minus first condition for www.google.com (google is a TLD)
-          if first_indx>found_indx && (first_indx - found_indx > 1) 
+          if first_indx>found_indx && (first_indx - found_indx == 1)
             first_indx = found_indx
           end
         end
@@ -40,9 +43,16 @@ def get_domain(url)
         first_indx = 1
       end
 
-
+      # special case when the first break is a tld
+      if ( finds.include? 0 ) && ( finds.include? 1 )
+        special = true
+      end
 
     end
+    if special 
+      first_indx += 1 
+    end
+
     # get one before it, and get everything after it
     final_url = new_url_split[(first_indx-1)..-1].join('.')
     final_url = final_url.gsub('_____','-')
@@ -53,7 +63,7 @@ end
 
 
 
-############# TEST CASES
+# ############# TEST CASES
 # get_domain('http://news.islandcreekoysters.com')
 # get_domain('http://www.news.islandcreekoysters.com')
 # get_domain('https://www.eonveyance.com')
@@ -63,5 +73,5 @@ end
 # get_domain('https://my.google.com') ## my is a TLD
 # get_domain('https://org.google.co.uk')
 # get_domain('https://org.com.co.uk')
-
-
+# get_domain('http://teaprincess.com.au')
+# get_domain('http://marcscarlett.com.au')
