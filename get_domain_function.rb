@@ -8,7 +8,6 @@ def get_domain(url)
     first_indx = 1
     found_match = false
     finds = []
-    special = false
     TLDS.each do |tld|
 
 
@@ -23,7 +22,7 @@ def get_domain(url)
       # weird edge case not handled: you.can.go.far.com  most times nobody does more than go.far.com
 
       found_indx = new_url_split.index{|x| x == tld} # finds occurrence of a matching tld
-      finds << found_indx
+      finds << found_indx if found_indx
       
       # for size 3 or greater
       if found_indx && found_indx>=1 && new_url_split.size >= 3
@@ -43,13 +42,9 @@ def get_domain(url)
         first_indx = 1
       end
 
-      # special case when the first break is a tld
-      if ( finds.include? 0 ) && ( finds.include? 1 )
-        special = true
-      end
-
     end
-    if special 
+    # special case when the first break is a tld
+    if ( finds.include? 0 ) && ( finds.include? 1 )
       first_indx += 1 
     end
 

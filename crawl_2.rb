@@ -38302,26 +38302,27 @@ DEFAULT_OPTS = {
   :depth_limit=>1,
   :user_agent=>UA,
   :discard_page_bodies => true,
-  :storage=> Anemone::Storage.Redis, #Anemone::Storage.PStore('pages.pstore'),
+  :storage=> Anemone::Storage.PStore('pages.pstore'),
   :accept_cookies => true,
   :read_timeout => 10,
   :verbose=>true
 }
 
 #domains = ['https://vitamart.ca']   ### make sure all urls have http in beginning, else relative url errors will occur
-domains = domains.shuffle[0..25]
+#domains = domains.shuffle[0..25]
 # domains = ['http://bexargoods.com']
 
 
-# object1 = Marshal.load(File.read('../mashape/"hs-analytics"/response_object_1')); 0
-# arr = object1.body['hits']['hits']; 0
-# domains = []
-# arr.each_with_index do |i,indx|
-#   # puts 'jrb + ' + indx.to_s
-#   # all sites seem to have redirect urls (and we only care about the ultimate domain so follow those)
-#   domains << 'http://'+get_domain(i['fields']['redirect'][0])
-# end ; 0
-# domains = domains.shuffle[0..20]
+object1 = Marshal.load(File.read('../mashape/"hs-analytics"/response_object_1')); 0
+arr = object1.body['hits']['hits']; 0
+domains = []
+arr.each_with_index do |i,indx|
+  # puts 'jrb + ' + indx.to_s
+  # all sites seem to have redirect urls (and we only care about the ultimate domain so follow those)
+  if indx%1000 == 0 then puts "adding domains #{indx/1000}%" end
+  domains << 'http://'+get_domain(i['fields']['redirect'][0])
+end ; 0
+domains = domains.shuffle[0..10000]
 
 
 
